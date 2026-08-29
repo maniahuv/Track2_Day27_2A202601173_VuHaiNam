@@ -131,3 +131,39 @@ artifact chu khong phai su co that):
 Ket luan: current=150 la anomaly duoi MOI baseline ngay trong tuan
 co the co (score 5.53 - 52.72, thap nhat van > nguong 3.5). Day la
 bang chung du manh de khang dinh su co that, khong phai artifact.
+
+--------------------------------------------------------------------
+BO SUNG (rank 3 root-cause hypotheses theo AI_AGENT_GUIDE.md): kiem tra
+order_id/created_at cua 150 dong con lai de phan biet 3 gia thuyet
+--------------------------------------------------------------------
+Full order_id range: 100000 - 100599
+150-dong order_id range: 100000 - 100149
+order_id lien tuc tuyet doi? True
+150-dong created_at range: 2026-08-29T13:23:29+0000 - 2026-08-29T16:42:29+0000
+Tuong quan order_id vs created_at tren FULL 600 dong (Pearson): 0.05299877861482619
+
+=> order_id lien tuc + khong tuong quan voi thoi gian => day la cat
+   theo VI TRI (positional truncation), khong phai loc theo noi dung
+   hay giam nhu cau that (ca 2 truong hop do se de lai khoang trong
+   rai rac trong dai order_id, khong phai 1 khoi lien tuc sach).
+
+--------------------------------------------------------------------
+Xac nhan lai GX Suite/Checkpoint (da nang cap sau khi viet report lan
+dau) van dong y voi contract_validator: khong bat duoc su co nay
+--------------------------------------------------------------------
+
+[SeverityAwareAction] worst_severity=None, action=none
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_unique        success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_between       success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_in_set        success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.WARNING
+expect_column_values_to_be_in_set        success=True severity=FailureSeverity.WARNING
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+
+Checkpoint result: PASS
+Recommended pipeline action: none
