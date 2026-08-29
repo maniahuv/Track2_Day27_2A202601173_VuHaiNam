@@ -1,0 +1,133 @@
+====================================================================
+PHASE 7 CASE STUDY - Full incident investigation (volume_drop)
+Ghi chu: Phase 6 (mystery dataset tu giang vien) chua co san trong
+session nay, nen dung lai public fault 'volume_drop' lam case study
+that de viet incident_report.md, dung dung khop voi scenario mo dau
+cua lab (CEO thay revenue giam bat thuong).
+Timestamp bat dau: 2026-08-29T15:11:40Z
+====================================================================
+
+--------------------------------------------------------------------
+BUOC 1: reset ve baseline khoe, chup lai 'truoc su co' (T0)
+--------------------------------------------------------------------
+Lab reset to a healthy baseline.
+T0 = 2026-08-29T15:11:43Z
+=== DATA RELIABILITY BASELINE ===
+orders rows              : 600
+contract failed checks   : 0
+critical contract fails  : 0
+recommended pipeline action: none
+row-count anomaly        : True (auto:same_segment_history+mad, score=18.75)
+freshness minutes        : 5.0
+KB length anomaly        : False
+sample blast radius      : fct_daily_revenue, ceo_revenue_dashboard
+report                    : reports\latest_metrics.json
+
+--------------------------------------------------------------------
+BUOC 2: inject fault (mo phong su co that, khong biet truoc)
+--------------------------------------------------------------------
+Injected partial-ingestion fault: kept 150/600 rows.
+T1 (fault injected) = 2026-08-29T15:11:44Z
+
+--------------------------------------------------------------------
+BUOC 3: thu thap evidence tang 1 - contract/GX validation
+--------------------------------------------------------------------
+ExpectColumnValuesToNotBeNull            success=True
+ExpectColumnValuesToBeUnique             success=True
+ExpectColumnValuesToBeBetween            success=True
+ExpectColumnValuesToBeInSet              success=True
+
+Starter GX result: PASS
+TODO: package these expectations into a Suite + ValidationDefinition + Checkpoint + Actions.
+Tong so check: 19 | So check FAIL: 0
+[]
+
+--------------------------------------------------------------------
+BUOC 4: thu thap evidence tang 2 - dbt build (transformation)
+--------------------------------------------------------------------
+Synced incoming CSV files into dbt seeds.
+15:12:03  12 of 18 START sql table model main.fct_daily_revenue .......................... [RUN]
+15:12:03  12 of 18 OK created sql table model main.fct_daily_revenue ..................... [OK in 0.05s]
+15:12:03  15 of 18 START test not_null_fct_daily_revenue_completed_order_rows ............ [RUN]
+15:12:03  14 of 18 START test assert_nonnegative_revenue ................................. [RUN]
+15:12:03  16 of 18 START test not_null_fct_daily_revenue_daily_revenue ................... [RUN]
+15:12:03  13 of 18 START test assert_completed_order_rows_match_source ................... [RUN]
+15:12:04  14 of 18 PASS assert_nonnegative_revenue ....................................... [PASS in 0.04s]
+15:12:04  16 of 18 PASS not_null_fct_daily_revenue_daily_revenue ......................... [PASS in 0.04s]
+15:12:04  17 of 18 START test not_null_fct_daily_revenue_order_date ...................... [RUN]
+15:12:04  15 of 18 PASS not_null_fct_daily_revenue_completed_order_rows .................. [PASS in 0.04s]
+15:12:04  13 of 18 PASS assert_completed_order_rows_match_source ......................... [PASS in 0.04s]
+15:12:04  18 of 18 START test unique_fct_daily_revenue_order_date ........................ [RUN]
+15:12:04  17 of 18 PASS not_null_fct_daily_revenue_order_date ............................ [PASS in 0.02s]
+15:12:04  18 of 18 PASS unique_fct_daily_revenue_order_date .............................. [PASS in 0.02s]
+15:12:04  
+15:12:04  Finished running 2 seeds, 1 table model, 12 data tests, 1 unit test, 2 view models in 0 hours 0 minutes and 3.66 seconds (3.66s).
+15:12:04  
+15:12:04  Completed successfully
+15:12:04  
+15:12:04  Done. PASS=18 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=18
+
+--------------------------------------------------------------------
+BUOC 5: thu thap evidence tang 3 - anomaly + freshness + lineage + SLO
+(run_baseline.py gom chung ca 4 tang nay)
+--------------------------------------------------------------------
+=== DATA RELIABILITY BASELINE ===
+orders rows              : 150
+contract failed checks   : 0
+critical contract fails  : 0
+recommended pipeline action: none
+row-count anomaly        : True (auto:same_segment_history+mad, score=5.53)
+freshness minutes        : 5.4
+KB length anomaly        : False
+sample blast radius      : fct_daily_revenue, ceo_revenue_dashboard
+report                    : reports\latest_metrics.json
+
+--------------------------------------------------------------------
+BUOC 6: dung SLO de dinh luong muc do nghiem trong (coi day la 1 bad
+check tren metric row_count/day, SLO gia dinh 99% cho completeness)
+--------------------------------------------------------------------
+{
+  "target": 0.99,
+  "actual_bad_rate": 1.0,
+  "allowed_bad_rate": 0.010000000000000009,
+  "burn_rate": 99.99999999999991,
+  "remaining_error_budget_fraction": 0.0,
+  "breached": true
+}
+
+--------------------------------------------------------------------
+BUOC 7: MITIGATION + RECOVERY - gia lap re-ingest day du, xac minh phuc hoi
+--------------------------------------------------------------------
+Lab reset to a healthy baseline.
+T2 (recovery) = 2026-08-29T15:12:08Z
+=== DATA RELIABILITY BASELINE ===
+orders rows              : 600
+contract failed checks   : 0
+critical contract fails  : 0
+recommended pipeline action: none
+row-count anomaly        : True (auto:same_segment_history+mad, score=18.75)
+freshness minutes        : 5.0
+KB length anomaly        : False
+sample blast radius      : fct_daily_revenue, ceo_revenue_dashboard
+report                    : reports\latest_metrics.json
+................                                                         [100%]
+16 passed in 0.50s
+
+--------------------------------------------------------------------
+BO SUNG: kiem tra robustness cua ket luan anomaly bang cach so sanh
+current=150 (luc su co) voi TAT CA 7 baseline ngay trong tuan (vi hom
+nay la Thu Bay that, du lieu baseline tinh 600 dong gay mismatch da
+biet - xem Phase 3 Decision 3 - nen can loai tru kha nang day la
+artifact chu khong phai su co that):
+--------------------------------------------------------------------
+  dow=0 (weekday) baseline=[639, 651, 605, 603, 579, 573] -> is_anomaly=True score=10.94
+  dow=1 (weekday) baseline=[594, 591, 625, 618, 620, 625] -> is_anomaly=True score=52.72
+  dow=2 (weekday) baseline=[588, 565, 623, 626, 567, 588] -> is_anomaly=True score=13.43
+  dow=3 (weekday) baseline=[640, 638, 622, 621, 598, 584] -> is_anomaly=True score=18.17
+  dow=4 (weekday) baseline=[568, 642, 638, 603, 597, 567] -> is_anomaly=True score=9.34
+  dow=5 (weekend) baseline=[247, 262, 268, 235, 235, 258] -> is_anomaly=True score=5.53
+  dow=6 (weekend) baseline=[270, 246, 265, 244, 259, 274] -> is_anomaly=True score=7.55
+
+Ket luan: current=150 la anomaly duoi MOI baseline ngay trong tuan
+co the co (score 5.53 - 52.72, thap nhat van > nguong 3.5). Day la
+bang chung du manh de khang dinh su co that, khong phai artifact.
