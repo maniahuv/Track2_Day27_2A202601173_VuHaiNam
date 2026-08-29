@@ -29,17 +29,17 @@ def zscore_detector(current: float, history: Iterable[float], threshold: float =
 
 
 def mad_detector(current: float, history: Iterable[float], threshold: float = 3.5) -> dict[str, Any]:
-    """Robust example, intentionally incomplete around zero-MAD edge cases.
-
-    Students may improve this function and/or use it from auto mode.
-    """
+    """Median/MAD detector: robust to the outliers and skew that break z-score."""
     values = np.asarray(list(history), dtype=float)
     if values.size < 5:
         return {"is_anomaly": False, "score": 0.0, "method": "mad", "reason": "insufficient_history"}
     median = float(np.median(values))
     mad = float(np.median(np.abs(values - median)))
     if mad == 0:
-        return {"is_anomaly": False, "score": 0.0, "method": "mad", "reason": "mad_is_zero_todo"}
+        # A perfectly flat history would otherwise make any nonzero deviation
+        # score as "infinitely" anomalous. Fall back to a small scale-relative
+        # epsilon so the detector stays usable instead of exploding to inf.
+        mad = max(abs(median) * 0.01, 1e-9)
     modified_z = 0.6745 * abs(float(current) - median) / mad
     return {
         "is_anomaly": bool(modified_z > threshold),
@@ -47,6 +47,42 @@ def mad_detector(current: float, history: Iterable[float], threshold: float = 3.
         "method": "mad",
         "reason": f"median={median:.3f}, mad={mad:.3f}, threshold={threshold}",
     }
+
+
+def context_aware_detector(
+    current: float,
+    history: Iterable[float],
+    *,
+    context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Seasonality-aware scorer used by `detect_anomaly(method="auto")`.
+
+    Prefers `context["same_segment_history"]` (e.g. same-weekday values) over
+    the raw, possibly multi-segment `history`, then always scores with the
+    robust median/MAD detector instead of a mean/std z-score. Pooling weekday
+    and weekend history into one z-score baseline inflates std enough that
+    even a large genuine drop can stay under the z>3 threshold (see
+    reports/agent_log.md Decision 3 for the worked example).
+    """
+    context = context or {}
+    same_segment = context.get("same_segment_history")
+    segment_values = list(same_segment) if same_segment is not None else []
+    use_segment = len(segment_values) >= 5
+    baseline = segment_values if use_segment else list(history)
+    baseline_source = "same_segment_history" if use_segment else "raw_history"
+
+    result = mad_detector(current, baseline)
+    result["method"] = f"auto:{baseline_source}+mad"
+    result["reason"] += f"; baseline_source={baseline_source}"
+
+    known_event = context.get("known_event")
+    if known_event:
+        # Annotate only -- whether an explained deviation should still page is
+        # an SLO/burn-rate decision (Phase 5), not something this detector
+        # should silently decide on its own.
+        result["reason"] += f"; known_event={known_event!r}"
+
+    return result
 
 
 def detect_anomaly(
@@ -59,22 +95,16 @@ def detect_anomaly(
 ) -> dict[str, Any]:
     """Stable lab API.
 
-    Current starter behavior:
-    - `zscore`: basic z-score.
-    - `mad`: MAD example.
-    - `auto`: still uses naive z-score and ignores context.
-
-    TODO(student): make `auto` context-aware. Useful context keys used by the
-    instructor may include `day_of_week`, `same_segment_history`,
-    `metric_name`, `known_event`, and `trend`.
+    - `zscore`: basic mean/std z-score.
+    - `mad`: median/MAD, robust to outliers and a flat/zero-variance history.
+    - `auto`: context-aware. Uses `context["same_segment_history"]` (e.g.
+      same-weekday values) when available, and always scores with median/MAD
+      so seasonality-inflated variance cannot mask a real drop.
     """
     if method == "mad":
         return mad_detector(current, history)
-    if method in {"zscore", "auto"}:
-        result = zscore_detector(current, history, threshold=threshold)
-        if method == "auto":
-            result["method"] = "auto:zscore"
-            if context:
-                result["reason"] += "; context_ignored_by_starter=true"
-        return result
+    if method == "zscore":
+        return zscore_detector(current, history, threshold=threshold)
+    if method == "auto":
+        return context_aware_detector(current, history, context=context)
     raise ValueError(f"Unsupported method: {method}")
