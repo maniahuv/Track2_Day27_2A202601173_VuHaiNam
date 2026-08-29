@@ -1,0 +1,44 @@
+====================================================================
+PHASE 4 EVIDENCE - Lineage & Blast Radius
+Timestamp: 2026-08-29T05:40:56Z
+File thay doi:
+  - observability/lineage.py: them _bfs_downstream() dung chung; sua
+    get_column_downstream() thanh transitive (truoc chi tra ve 1 hop
+    truc tiep); them load_column_graph(); nang cap
+    extract_dbt_dataset_graph() dung friendly name + loc node_types
+    (model/seed, bo qua test/unit_test).
+  - tests_public/test_lineage.py: them test transitive cho column.
+====================================================================
+
+--------------------------------------------------------------------
+$ pytest tests_public -q
+--------------------------------------------------------------------
+..............                                                           [100%]
+14 passed in 0.48s
+
+--------------------------------------------------------------------
+BAT BUOC: 'stg_orders bi loi -> assets nao bi anh huong?' (dataset-level)
+--------------------------------------------------------------------
+Dataset-level blast radius tu stg_orders:
+  ['fct_daily_revenue', 'ceo_revenue_dashboard']
+
+Dataset-level blast radius tu kb_documents (nhanh RAG/support agent):
+  ['kb_active_docs', 'rag_index', 'support_agent']
+
+Column-level blast radius tu raw_orders.amount (truoc day chi tra ve
+1 hop truc tiep, gio da transitive):
+  ['stg_orders.amount_usd', 'fct_daily_revenue.daily_revenue', 'ceo_revenue_dashboard.revenue']
+
+--------------------------------------------------------------------
+NANG CAO: parse dbt_project/target/manifest.json that (sau dbt build)
+va doi chieu voi lineage_graph.json thu cong
+--------------------------------------------------------------------
+dbt-derived dataset graph (model/seed only, friendly names):
+  customers: ['stg_customers']
+  fct_daily_revenue: []
+  orders: ['stg_orders']
+  stg_customers: ['fct_daily_revenue']
+  stg_orders: ['fct_daily_revenue']
+
+downstream_assets(graph, "stg_orders") tu manifest that:
+  ['fct_daily_revenue']
