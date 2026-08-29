@@ -5,6 +5,15 @@ models:
     description: Daily completed-order revenue for the CEO dashboard.
     columns:
       - name: order_date
+        description: Grain of this fact table -- one row per day.
+        data_tests:
+          - not_null
+          - unique
+      - name: completed_order_rows
+        description: >
+          Row count backing daily_revenue. Must reconcile with the number of
+          completed orders per day in stg_orders -- see
+          tests/assert_completed_order_rows_match_source.sql.
         data_tests:
           - not_null
       - name: daily_revenue

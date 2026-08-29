@@ -1,0 +1,46 @@
+# Why these are unit tests, not more not_null/unique data tests:
+# a data test (not_null/unique/accepted_values/relationships) checks facts
+# about REAL rows that already exist -- it can only tell you the output
+# happens to look clean today. A dbt unit test mocks the model's INPUTS and
+# asserts what the TRANSFORMATION LOGIC (the join/aggregation itself) must
+# produce. A wrong join can still emit rows that are all not-null and
+# individually well-formed while the aggregated numbers are wrong -- exactly
+# the revenue-inflation case below, which no not_null/unique test on the
+# output could ever catch because every row it produces still passes them.
+
+unit_tests:
+  - name: completed_orders_sum_to_expected_revenue
+    model: fct_daily_revenue
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, customer_id: C0001, amount_usd: 100.0, status: completed, order_date: '2026-08-01'}
+          - {order_id: 2, customer_id: C0001, amount_usd: 70.0, status: completed, order_date: '2026-08-01'}
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: C0001, is_active: true}
+    expect:
+      rows:
+        - {order_date: '2026-08-01', completed_order_rows: 2, daily_revenue: 170.0}
+
+  - name: duplicate_active_customer_row_must_not_inflate_revenue
+    model: fct_daily_revenue
+    description: >
+      Smallest case that exposes revenue inflation: stg_customers has two
+      active rows for the same customer_id (a realistic SCD bug) and exactly
+      one completed order exists for that customer. The correct output is
+      still one row of revenue for that order. This test is expected to FAIL
+      against the current starter fct_daily_revenue.sql, because its LEFT
+      JOIN fans out one output row per matching customer row -- that failure
+      is the point of the test.
+    given:
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 1, customer_id: C0001, amount_usd: 100.0, status: completed, order_date: '2026-08-01'}
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: C0001, is_active: true, valid_from: '2026-01-01 00:00:00'}
+          - {customer_id: C0001, is_active: true, valid_from: '2026-06-01 00:00:00'}
+    expect:
+      rows:
+        - {order_date: '2026-08-01', completed_order_rows: 1, daily_revenue: 100.0}
