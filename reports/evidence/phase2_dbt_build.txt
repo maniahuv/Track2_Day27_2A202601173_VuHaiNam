@@ -1,0 +1,129 @@
+====================================================================
+PHASE 2 EVIDENCE - dbt transformation protection
+Timestamp: 2026-08-29T05:22:26Z
+File thay doi:
+  - dbt_project/models/marts/schema.yml (+2 generic tests: unique
+    order_date, not_null completed_order_rows)
+  - dbt_project/tests/assert_completed_order_rows_match_source.sql
+    (singular business test, doi chieu voi stg_orders)
+  - dbt_project/models/marts/unit_tests.yml (thay .example): giu lai
+    unit test goc + them 1 unit test 'expose' loi revenue inflation
+  - fct_daily_revenue.sql: KHONG sua (dung theo huong dan
+    docs/AI_AGENT_GUIDE.md: 'Do not modify the production model yet')
+====================================================================
+
+--------------------------------------------------------------------
+$ dbt build   (FULL RUN - unit test expose bug se FAIL co chu dich)
+--------------------------------------------------------------------
+05:22:28  Running with dbt=1.12.3
+05:22:28  Registered adapter: duckdb=1.11.0
+05:22:29  Found 3 models, 12 data tests, 2 seeds, 500 macros, 2 unit tests
+05:22:29  
+05:22:29  Concurrency: 4 threads (target='dev')
+05:22:29  
+05:22:29  1 of 19 START seed file main.customers ......................................... [RUN]
+05:22:29  2 of 19 START seed file main.orders ............................................ [RUN]
+05:22:29  1 of 19 OK loaded seed file main.customers ..................................... [INSERT 81 in 0.10s]
+05:22:29  3 of 19 START sql view model main.stg_customers ................................ [RUN]
+05:22:29  2 of 19 OK loaded seed file main.orders ........................................ [INSERT 600 in 0.14s]
+05:22:29  4 of 19 START sql view model main.stg_orders ................................... [RUN]
+05:22:29  3 of 19 OK created sql view model main.stg_customers ........................... [OK in 0.06s]
+05:22:29  5 of 19 START test not_null_stg_customers_customer_id .......................... [RUN]
+05:22:29  4 of 19 OK created sql view model main.stg_orders .............................. [OK in 0.05s]
+05:22:29  5 of 19 PASS not_null_stg_customers_customer_id ................................ [PASS in 0.04s]
+05:22:29  7 of 19 START test accepted_values_stg_orders_status__pending__completed__refunded__cancelled  [RUN]
+05:22:29  8 of 19 START test not_null_stg_orders_customer_id ............................. [RUN]
+05:22:29  6 of 19 START test accepted_values_stg_orders_currency__USD__VND ............... [RUN]
+05:22:29  9 of 19 START test not_null_stg_orders_order_id ................................ [RUN]
+05:22:29  7 of 19 PASS accepted_values_stg_orders_status__pending__completed__refunded__cancelled  [PASS in 0.06s]
+05:22:29  8 of 19 PASS not_null_stg_orders_customer_id ................................... [PASS in 0.06s]
+05:22:29  6 of 19 PASS accepted_values_stg_orders_currency__USD__VND ..................... [PASS in 0.06s]
+05:22:29  10 of 19 START test unique_stg_orders_order_id ................................. [RUN]
+05:22:29  9 of 19 PASS not_null_stg_orders_order_id ...................................... [PASS in 0.06s]
+05:22:29  10 of 19 PASS unique_stg_orders_order_id ....................................... [PASS in 0.02s]
+05:22:29  11 of 19 START unit_test fct_daily_revenue::completed_orders_sum_to_expected_revenue  [RUN]
+05:22:29  11 of 19 PASS fct_daily_revenue::completed_orders_sum_to_expected_revenue ...... [PASS in 0.14s]
+05:22:29  12 of 19 START unit_test fct_daily_revenue::duplicate_active_customer_row_must_not_inflate_revenue  [RUN]
+05:22:29  12 of 19 FAIL 1 fct_daily_revenue::duplicate_active_customer_row_must_not_inflate_revenue  [FAIL 1 in 0.05s]
+05:22:29  13 of 19 SKIP relation main.fct_daily_revenue .................................. [SKIP]
+05:22:29  15 of 19 SKIP test assert_nonnegative_revenue .................................. [SKIP]
+05:22:29  16 of 19 SKIP test not_null_fct_daily_revenue_completed_order_rows ............. [SKIP]
+05:22:29  17 of 19 SKIP test not_null_fct_daily_revenue_daily_revenue .................... [SKIP]
+05:22:29  14 of 19 SKIP test assert_completed_order_rows_match_source .................... [SKIP]
+05:22:29  18 of 19 SKIP test not_null_fct_daily_revenue_order_date ....................... [SKIP]
+05:22:29  19 of 19 SKIP test unique_fct_daily_revenue_order_date ......................... [SKIP]
+05:22:29  
+05:22:29  Finished running 2 seeds, 1 table model, 12 data tests, 2 unit tests, 2 view models in 0 hours 0 minutes and 0.62 seconds (0.62s).
+05:22:29  
+05:22:29  Completed with 1 error, 0 partial successes, and 0 warnings:
+05:22:29  
+05:22:29  [ERROR]: in unit_test duplicate_active_customer_row_must_not_inflate_revenue (models\marts\unit_tests.yml)
+05:22:29    
+
+actual differs from expected:
+
+@@,order_date,completed_order_rows,daily_revenue
+
+→ ,2026-08-01,1→2                 ,100.0→200.0
+
+
+
+05:22:29  
+05:22:29    compiled code at target\compiled\data_reliability_lab\models\marts\unit_tests.yml\models\marts\duplicate_active_customer_row_must_not_inflate_revenue.sql
+05:22:29  
+05:22:29  Done. PASS=11 WARN=0 ERROR=1 SKIP=7 NO-OP=0 REUSED=0 TOTAL=19
+
+--------------------------------------------------------------------
+$ dbt build --exclude duplicate_active_customer_row_must_not_inflate_revenue
+  (loai tru dung unit test co chu dich FAIL, de xac nhan toan bo phan
+   con lai - model that + 2 generic test moi + singular test moi +
+   unit test goc - deu PASS)
+--------------------------------------------------------------------
+05:22:33  Running with dbt=1.12.3
+05:22:33  Registered adapter: duckdb=1.11.0
+05:22:34  Found 3 models, 12 data tests, 2 seeds, 500 macros, 2 unit tests
+05:22:34  
+05:22:34  Concurrency: 4 threads (target='dev')
+05:22:34  
+05:22:34  1 of 18 START seed file main.customers ......................................... [RUN]
+05:22:34  2 of 18 START seed file main.orders ............................................ [RUN]
+05:22:34  1 of 18 OK loaded seed file main.customers ..................................... [INSERT 81 in 0.09s]
+05:22:34  3 of 18 START sql view model main.stg_customers ................................ [RUN]
+05:22:34  2 of 18 OK loaded seed file main.orders ........................................ [INSERT 600 in 0.13s]
+05:22:34  4 of 18 START sql view model main.stg_orders ................................... [RUN]
+05:22:34  3 of 18 OK created sql view model main.stg_customers ........................... [OK in 0.05s]
+05:22:34  5 of 18 START test not_null_stg_customers_customer_id .......................... [RUN]
+05:22:34  5 of 18 PASS not_null_stg_customers_customer_id ................................ [PASS in 0.05s]
+05:22:34  4 of 18 OK created sql view model main.stg_orders .............................. [OK in 0.06s]
+05:22:34  6 of 18 START test accepted_values_stg_orders_currency__USD__VND ............... [RUN]
+05:22:34  7 of 18 START test accepted_values_stg_orders_status__pending__completed__refunded__cancelled  [RUN]
+05:22:34  9 of 18 START test not_null_stg_orders_order_id ................................ [RUN]
+05:22:34  8 of 18 START test not_null_stg_orders_customer_id ............................. [RUN]
+05:22:34  7 of 18 PASS accepted_values_stg_orders_status__pending__completed__refunded__cancelled  [PASS in 0.07s]
+05:22:34  6 of 18 PASS accepted_values_stg_orders_currency__USD__VND ..................... [PASS in 0.07s]
+05:22:34  9 of 18 PASS not_null_stg_orders_order_id ...................................... [PASS in 0.07s]
+05:22:34  10 of 18 START test unique_stg_orders_order_id ................................. [RUN]
+05:22:34  8 of 18 PASS not_null_stg_orders_customer_id ................................... [PASS in 0.08s]
+05:22:34  10 of 18 PASS unique_stg_orders_order_id ....................................... [PASS in 0.02s]
+05:22:34  11 of 18 START unit_test fct_daily_revenue::completed_orders_sum_to_expected_revenue  [RUN]
+05:22:34  11 of 18 PASS fct_daily_revenue::completed_orders_sum_to_expected_revenue ...... [PASS in 0.13s]
+05:22:34  12 of 18 START sql table model main.fct_daily_revenue .......................... [RUN]
+05:22:34  12 of 18 OK created sql table model main.fct_daily_revenue ..................... [OK in 0.07s]
+05:22:34  14 of 18 START test assert_nonnegative_revenue ................................. [RUN]
+05:22:34  13 of 18 START test assert_completed_order_rows_match_source ................... [RUN]
+05:22:34  16 of 18 START test not_null_fct_daily_revenue_daily_revenue ................... [RUN]
+05:22:34  15 of 18 START test not_null_fct_daily_revenue_completed_order_rows ............ [RUN]
+05:22:34  15 of 18 PASS not_null_fct_daily_revenue_completed_order_rows .................. [PASS in 0.05s]
+05:22:34  14 of 18 PASS assert_nonnegative_revenue ....................................... [PASS in 0.05s]
+05:22:34  13 of 18 PASS assert_completed_order_rows_match_source ......................... [PASS in 0.05s]
+05:22:34  16 of 18 PASS not_null_fct_daily_revenue_daily_revenue ......................... [PASS in 0.05s]
+05:22:34  17 of 18 START test not_null_fct_daily_revenue_order_date ...................... [RUN]
+05:22:34  18 of 18 START test unique_fct_daily_revenue_order_date ........................ [RUN]
+05:22:34  17 of 18 PASS not_null_fct_daily_revenue_order_date ............................ [PASS in 0.03s]
+05:22:34  18 of 18 PASS unique_fct_daily_revenue_order_date .............................. [PASS in 0.03s]
+05:22:35  
+05:22:35  Finished running 2 seeds, 1 table model, 12 data tests, 1 unit test, 2 view models in 0 hours 0 minutes and 0.71 seconds (0.71s).
+05:22:35  
+05:22:35  Completed successfully
+05:22:35  
+05:22:35  Done. PASS=18 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=18
