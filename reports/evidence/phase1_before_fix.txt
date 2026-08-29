@@ -1,0 +1,48 @@
+====================================================================
+PHASE 1 EVIDENCE - Contract + Validation
+Timestamp: 2026-08-29T04:59:07Z
+====================================================================
+
+--------------------------------------------------------------------
+$ python gx/validate_orders.py
+--------------------------------------------------------------------
+
+ExpectColumnValuesToNotBeNull            success=True
+
+ExpectColumnValuesToBeUnique             success=True
+
+ExpectColumnValuesToBeBetween            success=True
+
+ExpectColumnValuesToBeInSet              success=True
+
+Starter GX result: PASS
+TODO: package these expectations into a Suite + ValidationDefinition + Checkpoint + Actions.
+
+--------------------------------------------------------------------
+$ pytest tests_public/test_contracts.py -q
+--------------------------------------------------------------------
+...                                                                      [100%]
+3 passed in 0.42s
+
+--------------------------------------------------------------------
+$ python scripts/inject_fault.py duplicate_pk
+--------------------------------------------------------------------
+Injected duplicate order_id rows.
+
+--------------------------------------------------------------------
+$ python scripts/run_baseline.py   (sau khi inject duplicate_pk)
+--------------------------------------------------------------------
+=== DATA RELIABILITY BASELINE ===
+orders rows              : 603
+contract failed checks   : 1
+critical contract fails  : 1
+row-count anomaly        : True (auto:zscore, score=27.46)
+freshness minutes        : 6.6
+KB length anomaly        : False
+sample blast radius      : fct_daily_revenue, ceo_revenue_dashboard
+report                    : reports\latest_metrics.json
+
+--------------------------------------------------------------------
+$ python scripts/reset_lab.py   (khoi phuc data ve trang thai khoe)
+--------------------------------------------------------------------
+Lab reset to a healthy baseline.
