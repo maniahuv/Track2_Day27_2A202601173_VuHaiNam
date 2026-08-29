@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-29T15:12:08.700056+00:00",
+  "timestamp": "2026-08-29T16:17:12.785088+00:00",
   "orders_rows": 600,
   "failed_contract_checks": 0,
   "critical_contract_failures": 0,
@@ -10,7 +10,7 @@
     "method": "auto:same_segment_history+mad",
     "reason": "median=252.500, mad=12.500, threshold=3.5; baseline_source=same_segment_history"
   },
-  "freshness_minutes": 5.028176616666667,
+  "freshness_minutes": 11.379585283333334,
   "kb_text_length_signal": {
     "is_anomaly": false,
     "score": 0.7547940916996035,

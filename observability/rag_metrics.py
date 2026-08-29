@@ -4,7 +4,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
-from observability.anomaly import zscore_detector
+from observability.anomaly import mad_detector, zscore_detector
 
 
 def approximate_token_lengths(texts: Iterable[str]) -> list[int]:
@@ -27,11 +27,21 @@ def detect_text_length_shift(
 
 
 def detect_embedding_norm_shift(
-    current_norms: Iterable[float], baseline_norms: Iterable[float]
+    current_norms: Iterable[float], baseline_norms: Iterable[float], *, threshold: float = 3.5
 ) -> dict[str, Any]:
-    """TODO(student): implement embedding-space drift signal.
+    """Embedding-space drift signal from precomputed vector norms.
 
-    No embedding model is required for the starter lab. Hidden evaluation can
-    feed precomputed norms/similarities through this stable interface.
+    No embedding model is required: a change in embedding model/version, an
+    encoding bug, or garbled/truncated input text typically shifts the norm
+    distribution even without inspecting the actual vectors. Reuses the same
+    robust median/MAD detector as the Phase 3 anomaly module instead of a
+    third bespoke statistic -- embedding norms across many documents can be
+    skewed by a handful of unusually long/short docs, which is exactly the
+    scenario median/MAD is robust to and mean/std is not.
     """
-    return {"is_anomaly": False, "score": 0.0, "method": "not_implemented"}
+    norms = list(current_norms)
+    current_mean = float(np.mean(norms)) if norms else 0.0
+    result = mad_detector(current_mean, baseline_norms, threshold=threshold)
+    result["metric"] = "mean_embedding_norm"
+    result["current_mean"] = current_mean
+    return result

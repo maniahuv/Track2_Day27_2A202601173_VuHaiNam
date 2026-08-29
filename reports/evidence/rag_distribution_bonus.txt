@@ -1,0 +1,55 @@
+====================================================================
+BONUS: RAG embedding drift + PSI distribution upgrade
+Timestamp: 2026-08-29T16:16:01Z
+File thay doi:
+  - observability/rag_metrics.py: implement detect_embedding_norm_shift
+    (truoc la stub not_implemented), tai su dung mad_detector tu
+    observability/anomaly.py.
+  - observability/distribution.py: thay 'mean ratio' bang Population
+    Stability Index (PSI), chi dung numpy (khong dung scipy vi khong
+    co trong requirements.txt).
+  - tests_public/test_rag_metrics.py, tests_public/test_distribution.py:
+    them test moi.
+====================================================================
+
+--------------------------------------------------------------------
+$ pytest tests_public -q
+--------------------------------------------------------------------
+...................                                                      [100%]
+19 passed in 0.47s
+
+--------------------------------------------------------------------
+RAG embedding drift - collapsed vs normal
+--------------------------------------------------------------------
+Collapsed embeddings (broken embedding call):
+{
+  "is_anomaly": true,
+  "score": 25.23784224598938,
+  "method": "mad",
+  "reason": "median=0.995, mad=0.019, threshold=3.5",
+  "metric": "mean_embedding_norm",
+  "current_mean": 0.29500000000000004
+}
+
+Normal embeddings:
+{
+  "is_anomaly": false,
+  "score": 0.16952673796791232,
+  "method": "mad",
+  "reason": "median=0.995, mad=0.019, threshold=3.5",
+  "metric": "mean_embedding_norm",
+  "current_mean": 0.99
+}
+
+--------------------------------------------------------------------
+PSI distribution - shape-only shift ma mean-ratio cu se bo lo hoan toan
+--------------------------------------------------------------------
+baseline mean: 9.993333333333332 | current mean: 10.0 (gan bang nhau)
+mean-ratio CU se cho ra: 1.0006671114076051 -> is_anomaly: False (BO LO)
+PSI MOI:
+{
+  "is_anomaly": true,
+  "score": 3.787869881563441,
+  "method": "psi",
+  "reason": "baseline_mean=9.993, current_mean=10.000, bins=7, psi_threshold=0.25"
+}
