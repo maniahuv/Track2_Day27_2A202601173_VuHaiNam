@@ -1,0 +1,96 @@
+====================================================================
+PHASE 1 EVIDENCE (AFTER FIX) - Contract + Validation
+Timestamp: 2026-08-29T05:07:05Z
+Thay doi code: src/contract_validator.py (type validation, freshness
+validation, severity->action), scripts/run_baseline.py (in ra
+recommended pipeline action), tests_public/test_contracts.py (fix
+fixture dung timestamp tuong doi thay vi hardcode ngay cu).
+====================================================================
+
+--------------------------------------------------------------------
+$ pytest tests_public -q   (full public suite)
+--------------------------------------------------------------------
+..........                                                               [100%]
+10 passed in 0.47s
+
+--------------------------------------------------------------------
+$ python gx/validate_orders.py
+--------------------------------------------------------------------
+
+ExpectColumnValuesToNotBeNull            success=True
+
+ExpectColumnValuesToBeUnique             success=True
+
+ExpectColumnValuesToBeBetween            success=True
+
+ExpectColumnValuesToBeInSet              success=True
+
+Starter GX result: PASS
+TODO: package these expectations into a Suite + ValidationDefinition + Checkpoint + Actions.
+
+--------------------------------------------------------------------
+$ python scripts/run_baseline.py   (healthy baseline, kiem tra action=none)
+--------------------------------------------------------------------
+=== DATA RELIABILITY BASELINE ===
+orders rows              : 600
+contract failed checks   : 0
+critical contract fails  : 0
+recommended pipeline action: none
+row-count anomaly        : True (auto:zscore, score=27.23)
+freshness minutes        : 13.0
+KB length anomaly        : False
+sample blast radius      : fct_daily_revenue, ceo_revenue_dashboard
+report                    : reports\latest_metrics.json
+
+--------------------------------------------------------------------
+$ python scripts/inject_fault.py duplicate_pk
+--------------------------------------------------------------------
+Injected duplicate order_id rows.
+
+--------------------------------------------------------------------
+$ python scripts/run_baseline.py   (sau khi inject duplicate_pk -> action phai la 'block')
+--------------------------------------------------------------------
+=== DATA RELIABILITY BASELINE ===
+orders rows              : 603
+contract failed checks   : 1
+critical contract fails  : 1
+recommended pipeline action: block
+row-count anomaly        : True (auto:zscore, score=27.46)
+freshness minutes        : 13.0
+KB length anomaly        : False
+sample blast radius      : fct_daily_revenue, ceo_revenue_dashboard
+report                    : reports\latest_metrics.json
+
+--------------------------------------------------------------------
+$ python scripts/reset_lab.py
+--------------------------------------------------------------------
+Lab reset to a healthy baseline.
+
+--------------------------------------------------------------------
+Demo bo sung: type drift + freshness qua python -c (khong co fault
+script rieng cho 2 truong hop nay trong scripts/inject_fault.py, nen
+kiem chung truc tiep qua student_api.validate_orders).
+--------------------------------------------------------------------
+Case A - type drift tren cot amount:
+[
+  {
+    "check": "type",
+    "column": "amount",
+    "severity": "critical",
+    "passed": false,
+    "action": "block",
+    "details": "declared_type=number; invalid_count=1"
+  }
+]
+
+Case B - freshness qua han (updated_at 180 phut truoc, cho phep 30 phut):
+[
+  {
+    "check": "freshness",
+    "column": "updated_at",
+    "severity": "warning",
+    "passed": false,
+    "action": "quarantine",
+    "details": "latest=2026-08-29T02:07:12+00:00, delay_minutes=180.01, max_delay_minutes=30"
+  }
+]

@@ -15,7 +15,7 @@ from observability.anomaly import detect_anomaly
 from observability.lineage import get_downstream_assets
 from observability.rag_metrics import detect_text_length_shift
 from observability.slo import calculate_slo
-from src.contract_validator import failed_issues, load_contract, validate_dataframe
+from src.contract_validator import failed_issues, load_contract, pipeline_action, validate_dataframe
 from src.io_utils import load_jsonl
 
 
@@ -26,6 +26,7 @@ def main() -> None:
     issues = validate_dataframe(orders, contract)
     failed = failed_issues(issues)
     critical_failed = failed_issues(issues, min_severity="critical")
+    recommended_action = pipeline_action(issues)
 
     # Public example: segment by weekday before applying the simple detector.
     # Hidden evaluation still challenges students to make detect_metric(..., context=...)
@@ -63,6 +64,7 @@ def main() -> None:
         "orders_rows": int(len(orders)),
         "failed_contract_checks": len(failed),
         "critical_contract_failures": len(critical_failed),
+        "contract_pipeline_action": recommended_action,
         "row_count_anomaly": row_result,
         "freshness_minutes": freshness_minutes,
         "kb_text_length_signal": text_result,
@@ -76,6 +78,7 @@ def main() -> None:
     print(f"orders rows              : {len(orders)}")
     print(f"contract failed checks   : {len(failed)}")
     print(f"critical contract fails  : {len(critical_failed)}")
+    print(f"recommended pipeline action: {recommended_action}")
     print(f"row-count anomaly        : {row_result['is_anomaly']} ({row_result['method']}, score={row_result['score']:.2f})")
     print(f"freshness minutes        : {freshness_minutes:.1f}")
     print(f"KB length anomaly        : {text_result['is_anomaly']}")
