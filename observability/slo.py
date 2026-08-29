@@ -35,17 +35,57 @@ def evaluate_multiwindow_burn(
     *,
     short_window_burn: float,
     long_window_burn: float,
-    policy: str = "starter",
+    policy: str = "google_sre_multiwindow",
+    fast_burn_threshold: float = 14.4,
+    slow_burn_threshold: float = 6.0,
 ) -> dict[str, Any]:
-    """TODO(student): implement a real multi-window burn-rate policy.
+    """Multi-window burn-rate paging policy (Google SRE Workbook style).
 
-    Starter intentionally never pages. Hidden evaluation contains cases that
-    require distinguishing sustained fast burn from a transient spike.
+    A single window can't tell a real sustained incident apart from a brief
+    spike that has already recovered -- both look identical while they're
+    happening. Requiring the LONG window to *also* be elevated is what tells
+    them apart: a short blip gets diluted away by the long window's much
+    larger sample of otherwise-good events, so its long-window burn stays low
+    even though its short-window burn spiked. Only a burn that is fast in
+    BOTH windows has actually been sustained long enough to page on.
+
+    - fast in both windows      -> page now (critical)
+    - fast short-window spike, long window still low -> transient, no page (warning)
+    - slow but sustained in both windows -> ticket, no page (warning)
+    - otherwise -> healthy (info)
     """
+    fast_both = short_window_burn >= fast_burn_threshold and long_window_burn >= fast_burn_threshold
+    transient_spike = short_window_burn >= fast_burn_threshold and long_window_burn < slow_burn_threshold
+    slow_both = short_window_burn >= slow_burn_threshold and long_window_burn >= slow_burn_threshold
+
+    if fast_both:
+        page, severity = True, "critical"
+        reason = (
+            f"fast sustained burn: short={short_window_burn:.2f} and "
+            f"long={long_window_burn:.2f} both >= {fast_burn_threshold} -- page now"
+        )
+    elif transient_spike:
+        page, severity = False, "warning"
+        reason = (
+            f"transient spike: short={short_window_burn:.2f} >= {fast_burn_threshold} but "
+            f"long={long_window_burn:.2f} < {slow_burn_threshold} -- not sustained, no page"
+        )
+    elif slow_both:
+        page, severity = False, "warning"
+        reason = (
+            f"sustained slow burn: short={short_window_burn:.2f} and "
+            f"long={long_window_burn:.2f} both >= {slow_burn_threshold} but below the fast-burn "
+            f"threshold -- file a ticket, no page"
+        )
+    else:
+        page, severity = False, "info"
+        reason = f"within budget: short={short_window_burn:.2f}, long={long_window_burn:.2f}"
+
     return {
-        "page": False,
-        "severity": "info",
-        "reason": "starter_policy_not_implemented",
+        "page": page,
+        "severity": severity,
+        "reason": reason,
         "short_window_burn": short_window_burn,
         "long_window_burn": long_window_burn,
+        "policy": policy,
     }
