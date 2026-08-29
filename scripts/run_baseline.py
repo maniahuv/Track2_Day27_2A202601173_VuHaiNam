@@ -28,17 +28,21 @@ def main() -> None:
     critical_failed = failed_issues(issues, min_severity="critical")
     recommended_action = pipeline_action(issues)
 
-    # Public example: segment by weekday before applying the simple detector.
-    # Hidden evaluation still challenges students to make detect_metric(..., context=...)
-    # context-aware instead of relying on caller-side preprocessing.
+    # Full history plus the same-weekday segment go through `context`, so
+    # detect_anomaly(method="auto") itself decides how to use seasonality
+    # instead of the caller pre-filtering the baseline.
     current_dow = datetime.now().weekday()
-    segment = history.loc[history["day_of_week"] == current_dow, "row_count"].tail(8).tolist()
-    row_history = segment if len(segment) >= 3 else history["row_count"].tail(14).tolist()
+    full_row_history = history["row_count"].tolist()
+    same_segment = history.loc[history["day_of_week"] == current_dow, "row_count"].tail(8).tolist()
     row_result = detect_anomaly(
         len(orders),
-        row_history,
+        full_row_history,
         method="auto",
-        context={"metric_name": "row_count", "day_of_week": current_dow},
+        context={
+            "metric_name": "row_count",
+            "day_of_week": current_dow,
+            "same_segment_history": same_segment,
+        },
     )
 
     updated = pd.to_datetime(orders["updated_at"], utc=True, errors="coerce")

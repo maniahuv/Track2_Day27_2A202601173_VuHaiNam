@@ -1,0 +1,99 @@
+====================================================================
+PHASE 3 EVIDENCE - Anomaly detection
+Timestamp: 2026-08-29T05:34:06Z
+File thay doi:
+  - observability/anomaly.py: mad_detector() fix zero-MAD edge case;
+    them context_aware_detector() cho method=auto (uu tien
+    context['same_segment_history'], luon dung median/MAD thay vi
+    z-score de khong bi seasonality lam mat do nhay).
+  - scripts/run_baseline.py: truyen full history + same_segment_history
+    qua context thay vi tien xu ly phia caller.
+  - tests_public/test_anomaly_auto.py (moi): pin lai that bai cua
+    naive z-score va xac nhan auto+context sua duoc.
+====================================================================
+
+--------------------------------------------------------------------
+$ pytest tests_public -q   (full public suite, bao gom 3 test moi)
+--------------------------------------------------------------------
+.............                                                            [100%]
+13 passed in 0.48s
+
+--------------------------------------------------------------------
+$ pytest tests_public/test_anomaly_auto.py -v
+--------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.13.11, pytest-9.1.1, pluggy-1.6.0 -- D:\AI20K\Track2\Track2_Day27_2A202601173_VuHaiNam\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\AI20K\Track2\Track2_Day27_2A202601173_VuHaiNam
+plugins: anyio-4.14.2
+collecting ... collected 3 items
+
+tests_public/test_anomaly_auto.py::test_naive_zscore_masks_a_real_70_percent_drop_on_seasonal_data PASSED [ 33%]
+tests_public/test_anomaly_auto.py::test_auto_same_weekday_context_catches_the_same_drop PASSED [ 66%]
+tests_public/test_anomaly_auto.py::test_auto_does_not_flag_a_legitimate_saturday_value PASSED [100%]
+
+============================== 3 passed in 0.42s ==============================
+
+--------------------------------------------------------------------
+$ python scripts/reset_lab.py
+--------------------------------------------------------------------
+Lab reset to a healthy baseline.
+
+--------------------------------------------------------------------
+$ python scripts/run_baseline.py   (healthy baseline, truoc fault)
+--------------------------------------------------------------------
+=== DATA RELIABILITY BASELINE ===
+orders rows              : 600
+contract failed checks   : 0
+critical contract fails  : 0
+recommended pipeline action: none
+row-count anomaly        : True (auto:same_segment_history+mad, score=18.75)
+freshness minutes        : 5.0
+KB length anomaly        : False
+sample blast radius      : fct_daily_revenue, ceo_revenue_dashboard
+report                    : reports\latest_metrics.json
+
+--------------------------------------------------------------------
+$ python scripts/inject_fault.py volume_drop
+--------------------------------------------------------------------
+Injected partial-ingestion fault: kept 150/600 rows.
+
+--------------------------------------------------------------------
+$ python scripts/run_baseline.py   (sau volume_drop -> phai bat duoc anomaly)
+--------------------------------------------------------------------
+=== DATA RELIABILITY BASELINE ===
+orders rows              : 150
+contract failed checks   : 0
+critical contract fails  : 0
+recommended pipeline action: none
+row-count anomaly        : True (auto:same_segment_history+mad, score=5.53)
+freshness minutes        : 5.0
+KB length anomaly        : False
+sample blast radius      : fct_daily_revenue, ceo_revenue_dashboard
+report                    : reports\latest_metrics.json
+
+--------------------------------------------------------------------
+$ python scripts/reset_lab.py   (khoi phuc trang thai khoe)
+--------------------------------------------------------------------
+Lab reset to a healthy baseline.
+
+--------------------------------------------------------------------
+DIEU TRA THEM: healthy baseline (current=600) bi bao anomaly=True vao
+hom nay (2026-08-29, thu Bay). Kiem tra bang cach quet ca 7 ngay trong
+tuan de xac nhan day la dac thu cua du lieu synthetic tinh, khong phai
+loi cua detector:
+--------------------------------------------------------------------
+weekday=0 same_segment=[639, 651, 605, 603, 579, 573] -> current=600 is_anomaly=False score=0.10
+weekday=1 same_segment=[594, 591, 625, 618, 620, 625] -> current=600 is_anomaly=False score=2.14
+weekday=2 same_segment=[588, 565, 623, 626, 567, 588] -> current=600 is_anomaly=False score=0.37
+weekday=3 same_segment=[640, 638, 622, 621, 598, 584] -> current=600 is_anomaly=False score=0.83
+weekday=4 same_segment=[568, 642, 638, 603, 597, 567] -> current=600 is_anomaly=False score=0.00
+weekday=5 same_segment=[247, 262, 268, 235, 235, 258] -> current=600 is_anomaly=True score=18.75
+weekday=6 same_segment=[270, 246, 265, 244, 259, 274] -> current=600 is_anomaly=True score=22.80
+
+Ket luan: current=600 (dinh dang gia lap ngay thuong, luon co dinh
+trong data/baseline/orders.csv bat ke reset_lab.py chay vao ngay nao)
+chi bi bao anomaly khi weekday=5 hoac 6 (cuoi tuan that), vi baseline
+lich su cuoi tuan chi ~250. Day la gioi han cua bo du lieu synthetic
+tinh (nam ngoai pham vi observability/anomaly.py), khong phai loi cua
+context_aware_detector -- detector dang lam dung viec cua no.
