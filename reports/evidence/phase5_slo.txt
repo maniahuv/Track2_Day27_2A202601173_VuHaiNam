@@ -1,0 +1,54 @@
+====================================================================
+PHASE 5 EVIDENCE - SLO / Error Budget
+Timestamp: 2026-08-29T13:40:29Z
+File thay doi:
+  - observability/slo.py: implement evaluate_multiwindow_burn() theo
+    chinh sach Google SRE multi-window burn-rate (truoc day luon tra
+    ve page=False, chua implement gi).
+  - tests_public/test_slo.py: them 2 test cho sustained fast burn
+    (page) va transient spike (khong page).
+  - calculate_slo() KHONG sua vi da dung san (test cong khai da xac
+    nhan tu truoc: burn_rate=4.0, breached=True cho SLO=99.5%, 2/100).
+====================================================================
+
+--------------------------------------------------------------------
+$ pytest tests_public -q
+--------------------------------------------------------------------
+................                                                         [100%]
+16 passed in 0.55s
+
+--------------------------------------------------------------------
+BAT BUOC: SLO=99.5%, 2 bad checks / 100 checks
+--------------------------------------------------------------------
+{
+  "target": 0.995,
+  "actual_bad_rate": 0.02,
+  "allowed_bad_rate": 0.0050000000000000044,
+  "burn_rate": 3.9999999999999964,
+  "remaining_error_budget_fraction": 0.0,
+  "breached": true
+}
+
+Tra loi:
+  actual bad rate   = 0.02  (2/100)
+  allowed bad rate  = 0.0050000000000000044  (1 - 0.995)
+  burn rate         = 3.9999999999999964  (actual / allowed = 0.02 / 0.005)
+  breached          = True  (0.02 > 0.005)
+  y nghia: dang "dot" error budget nhanh gap 4 lan toc do cho phep;
+  neu duy tri toc do nay, budget ca ky se can trong 1/4 thoi gian ky.
+
+--------------------------------------------------------------------
+ADVANCED: multiwindow_burn() - 4 kich ban
+--------------------------------------------------------------------
+sustained fast burn (PHAI page):
+  {"page": true, "severity": "critical", "reason": "fast sustained burn: short=20.00 and long=15.00 both >= 14.4 -- page now", "short_window_burn": 20.0, "long_window_burn": 15.0, "policy": "google_sre_multiwindow"}
+
+transient spike ngan (KHONG duoc page):
+  {"page": false, "severity": "warning", "reason": "transient spike: short=20.00 >= 14.4 but long=1.00 < 6.0 -- not sustained, no page", "short_window_burn": 20.0, "long_window_burn": 1.0, "policy": "google_sre_multiwindow"}
+
+sustained slow burn (ticket, khong page):
+  {"page": false, "severity": "warning", "reason": "sustained slow burn: short=8.00 and long=7.00 both >= 6.0 but below the fast-burn threshold -- file a ticket, no page", "short_window_burn": 8.0, "long_window_burn": 7.0, "policy": "google_sre_multiwindow"}
+
+healthy (khong lam gi):
+  {"page": false, "severity": "info", "reason": "within budget: short=0.50, long=0.30", "short_window_burn": 0.5, "long_window_burn": 0.3, "policy": "google_sre_multiwindow"}
+
