@@ -40,18 +40,44 @@ tính doanh thu ngày đó thấp hơn thực tế, lan tới CEO dashboard.
   trong `data/incoming/` bị ghi lại với 150 dòng — mốc T1 trong log điều tra).
 
 ## Root Cause
-Tệp `data/incoming/orders.csv` bị ghi đè bởi một phiên bản chỉ chứa 150/600
-dòng (giữ đúng phần đầu file) — mô phỏng lỗi partial-write/truncation từ job
-upstream (ví dụ: job export bị timeout/kill giữa chừng nhưng vẫn ghi file
-"thành công" một phần, hoặc pagination bị dừng sớm). Không có exception nào
-được raise nên hệ thống downstream (dbt, dashboard) coi đây là dữ liệu hợp lệ
-và xử lý bình thường trên tập 150 dòng.
+
+Theo đúng gợi ý workflow của `docs/AI_AGENT_GUIDE.md` ("rank three root-cause
+hypotheses and list evidence for/against each"), trước khi kết luận đã kiểm
+tra 3 giả thuyết bằng bằng chứng cụ thể từ chính dữ liệu `orders.csv` lúc sự
+cố (không đoán mò):
+
+**Bằng chứng nền tảng đã kiểm tra:**
+- `order_id` của 150 dòng còn lại là một khối **liên tục tuyệt đối**:
+  `100000`–`100149`, không có khoảng trống nào (`diff == 1` đúng 100%).
+- `created_at` của 150 dòng còn lại vẫn trải **toàn bộ khung giờ trong ngày**
+  (`12:44` → `16:03`), gần như trùng khít range của cả 600 dòng gốc
+  (`12:44` → `16:04`).
+- Tương quan Pearson giữa `order_id` và `created_at` trên toàn bộ 600 dòng
+  gốc ≈ **0.05** (gần như không tương quan) — tức file KHÔNG được sắp xếp
+  theo thời gian, `order_id` không phản ánh thứ tự thời gian thực.
+
+| # | Giả thuyết | Evidence ỦNG HỘ | Evidence PHẢN BÁC | Kết luận |
+|---|---|---|---|---|
+| 1 | **Partial/truncated positional export** — job upstream (export/API phân trang) bị dừng giữa chừng nhưng vẫn ghi file "thành công" một phần, cắt đúng tại vị trí dòng thứ 150 | `order_id` liên tục tuyệt đối 100000-100149 — đúng chữ ký của việc "dừng đọc/ghi sau N bản ghi", không phải lọc theo nội dung | Không tìm thấy | ✅ **Được chọn** |
+| 2 | **Sụt giảm nhu cầu thật** (khách hàng đặt ít đơn hơn thật sự, vd do outage phía storefront) | Không có | Vì `order_id` không tương quan với `created_at` (r≈0.05), nếu do nhu cầu giảm thật thì các đơn còn lại phải **rải rác toàn bộ dải order_id** (khách vẫn đặt hàng bình thường ở các thời điểm khác nhau, chỉ là ít hơn) — không thể tạo ra một khối order_id liên tục tuyệt đối 100% một cách tự nhiên | ❌ Loại bỏ |
+| 3 | **Bộ lọc/dedup nội dung lỗi** xoá nhầm 450 đơn hợp lệ vì tưởng là trùng/spam | Không có | Một bộ lọc theo nội dung (dedup, spam-filter, business rule) sẽ để lại **khoảng trống rải rác** trong dải order_id (đơn nào bị coi là lỗi thì mất, không theo vị trí), không tạo ra một khối liên tục sạch từ đầu | ❌ Loại bỏ |
+
+**Root cause được chọn:** Tệp `data/incoming/orders.csv` bị ghi đè bởi một
+phiên bản chỉ chứa 150/600 dòng (giữ đúng khối `order_id` đầu) — khớp với lỗi
+partial-write/truncation từ job upstream (job export bị timeout/kill giữa
+chừng nhưng vẫn ghi file "thành công" một phần, hoặc pagination dừng sau
+trang đầu). Không có exception nào được raise nên hệ thống downstream (dbt,
+dashboard) coi đây là dữ liệu hợp lệ và xử lý bình thường trên tập 150 dòng.
 
 ## Evidence
-1. **Contract/GX (tầng 1 — không phát hiện được):**
+1. **Contract/GX (tầng 1 — không phát hiện được, xác nhận bởi CẢ 2 engine):**
    `validate_orders(...)` trên 150 dòng còn lại → `19 checks, 0 failed`.
-   `gx/validate_orders.py` → 4/4 expectation `success=True`, "Starter GX
-   result: PASS". Xác nhận: đây không phải data-quality issue cấp hàng.
+   `gx/validate_orders.py` (Suite sinh từ `contracts/orders_contract.yaml`,
+   11 expectation qua Checkpoint) → toàn bộ `success=True`, Checkpoint
+   `PASS`, `Recommended pipeline action: none`. Xác nhận: đây không phải
+   data-quality issue cấp hàng — cả validator tự viết lẫn Great Expectations
+   đều đồng thuận "sạch" trên đúng 150 dòng còn lại, vì thiếu-cả-một-mảng-dữ-liệu
+   không phải thứ mà validation cấp hàng (row-level) có thể nhìn thấy được.
 2. **dbt build (tầng 2 — vẫn xanh, vì đúng là không có lỗi transform):**
    `dbt build` trên seed 150 dòng → `Done. PASS=18 WARN=0 ERROR=0 SKIP=0`.
    `fct_daily_revenue` vẫn build đúng logic, chỉ là tổng doanh thu thấp hơn vì
