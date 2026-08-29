@@ -1,0 +1,69 @@
+====================================================================
+GX SUITE/CHECKPOINT/ACTION - Kiem chung
+Timestamp: 2026-08-29T16:10:38Z
+====================================================================
+
+--------------------------------------------------------------------
+Case 1: du lieu khoe -> ky vong PASS, action=none
+--------------------------------------------------------------------
+
+[SeverityAwareAction] worst_severity=None, action=none
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_unique        success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_between       success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_in_set        success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.WARNING
+expect_column_values_to_be_in_set        success=True severity=FailureSeverity.WARNING
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+
+Checkpoint result: PASS
+Recommended pipeline action: none
+
+--------------------------------------------------------------------
+Case 2: inject duplicate_pk (loi critical: unique order_id)
+-> ky vong FAIL, action=block
+--------------------------------------------------------------------
+Injected duplicate order_id rows.
+
+[SeverityAwareAction] worst_severity=critical, action=block
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_unique        success=False severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_between       success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_in_set        success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.WARNING
+expect_column_values_to_be_in_set        success=True severity=FailureSeverity.WARNING
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+
+Checkpoint result: FAIL
+Recommended pipeline action: block
+Lab reset to a healthy baseline.
+
+--------------------------------------------------------------------
+Case 3: chi loi WARNING (status ngoai accepted_values, severity=warning
+trong contract) -> ky vong FAIL nhung action=quarantine, khong phai block
+--------------------------------------------------------------------
+
+[SeverityAwareAction] worst_severity=warning, action=quarantine
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_unique        success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_between       success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_be_in_set        success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.WARNING
+expect_column_values_to_be_in_set        success=False severity=FailureSeverity.WARNING
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+expect_column_values_to_not_be_null      success=True severity=FailureSeverity.CRITICAL
+
+Checkpoint result: FAIL
+Recommended pipeline action: quarantine
+Lab reset to a healthy baseline.
